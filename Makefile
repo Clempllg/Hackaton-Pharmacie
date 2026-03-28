@@ -8,15 +8,15 @@
 TARGET = challenge
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17
+LDFLAGS = -L.
+LDLIBS = -lsim
 
 SRC = main.cpp
 
-LIB = libsim.a
-
 all: $(TARGET)
 
-$(TARGET): $(SRC) $(LIB)
-	$(CXX) $(CXXFLAGS) $(SRC) $(LIB) -o $(TARGET)
+$(TARGET): $(SRC)
+	$(CXX) $(CXXFLAGS) $(SRC) $(LDFLAGS) $(LDLIBS) -o $(TARGET)
 
 clean:
 	rm -f $(TARGET)
