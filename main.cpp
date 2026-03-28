@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <thread>
 
-#include "CroixPharma.h"
+#include "Lib_Croix/CroixPharma.h"
 
 namespace {
 std::atomic<bool> g_running{true};
