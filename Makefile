@@ -8,13 +8,13 @@
 TARGET = challenge
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17
-INCLUDES = -IPharmalgo/Lib_Croix -Ilibcroix/WiringPi/wiringPi
+INCLUDES = -I/Lib_Croix -Ilibcroix/WiringPi/wiringPi
 LDFLAGS = -Llibcroix/WiringPi/wiringPi -Wl,-rpath,'$$ORIGIN/libcroix/WiringPi/wiringPi'
 LDLIBS = -lwiringPi
 
 SRC = \
 	main.cpp \
-	Pharmalgo/Lib_Croix/CroixPharma.cpp
+	Lib_Croix/CroixPharma.cpp
 
 all: $(TARGET)
 
