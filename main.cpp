@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <thread>
 
-#include "sim.hpp"
+#include "Lib_Croix/CroixPharma.h"
 
 namespace {
 std::atomic<bool> g_running{true};
@@ -16,7 +16,6 @@ constexpr int kFrameRate = 30;
 constexpr int kFrameTimeMs = 1000 / kFrameRate;
 constexpr int kLoopFrames = 900;
 
-using Bitmap = std::array<uint8_t, 5 * kPanelSize * kPanelSize>;
 using Canvas = std::array<std::array<uint8_t, kGridSize>, kGridSize>;
 
 enum class FormType {
@@ -81,29 +80,6 @@ bool is_drawable(int y, int x)
         || (panel_y == 2 && panel_x == 1);
 }
 
-int panel_index(int y, int x)
-{
-    const int panel_y = y / kPanelSize;
-    const int panel_x = x / kPanelSize;
-
-    if (panel_y == 0 && panel_x == 1) {
-        return 2;
-    }
-    if (panel_y == 1 && panel_x == 0) {
-        return 4;
-    }
-    if (panel_y == 1 && panel_x == 1) {
-        return 1;
-    }
-    if (panel_y == 1 && panel_x == 2) {
-        return 3;
-    }
-    if (panel_y == 2 && panel_x == 1) {
-        return 0;
-    }
-    return -1;
-}
-
 void set_pixel(Canvas &canvas, int y, int x, uint8_t value)
 {
     if (y < 0 || y >= kGridSize || x < 0 || x >= kGridSize) {
@@ -122,28 +98,28 @@ bool form_pixel(FormType type, int local_y, int local_x)
     }
 
     switch (type) {
-    case FormType::DRight: {
-        constexpr std::array<std::array<uint8_t, 4>, 4> pattern = {{
-            {{1, 1, 1, 0}},
-            {{1, 0, 0, 1}},
-            {{1, 0, 0, 1}},
-            {{1, 1, 1, 0}},
-        }};
-        return pattern[static_cast<std::size_t>(local_y)][static_cast<std::size_t>(local_x)] != 0;
-    }
-    case FormType::TriangleBottomRight:
-        return local_x + local_y >= 3;
-    case FormType::TriangleTopLeft:
-        return local_x + local_y <= 3;
-    case FormType::DUp: {
-        constexpr std::array<std::array<uint8_t, 4>, 4> pattern = {{
-            {{0, 1, 1, 0}},
-            {{1, 0, 0, 1}},
-            {{1, 0, 0, 1}},
-            {{1, 1, 1, 1}},
-        }};
-        return pattern[static_cast<std::size_t>(local_y)][static_cast<std::size_t>(local_x)] != 0;
-    }
+        case FormType::DRight: {
+            constexpr std::array<std::array<uint8_t, 4>, 4> pattern = {{
+                {{1, 1, 1, 0}},
+                {{1, 0, 0, 1}},
+                {{1, 0, 0, 1}},
+                {{1, 1, 1, 0}},
+            }};
+            return pattern[static_cast<std::size_t>(local_y)][static_cast<std::size_t>(local_x)] != 0;
+        }
+        case FormType::TriangleBottomRight:
+            return local_x + local_y >= 3;
+        case FormType::TriangleTopLeft:
+            return local_x + local_y <= 3;
+        case FormType::DUp: {
+            constexpr std::array<std::array<uint8_t, 4>, 4> pattern = {{
+                {{0, 1, 1, 0}},
+                {{1, 0, 0, 1}},
+                {{1, 0, 0, 1}},
+                {{1, 1, 1, 1}},
+            }};
+            return pattern[static_cast<std::size_t>(local_y)][static_cast<std::size_t>(local_x)] != 0;
+        }
     }
 
     return false;
@@ -175,6 +151,51 @@ void draw_logo(Canvas &canvas, int top, int left, int reveal_pixels)
             left + kLogoLeft[static_cast<std::size_t>(i)], reveal_pixels);
     }
 }
+
+// void draw_drime_text(Canvas &canvas, int top, int left, int reveal_pixels)
+// {
+//     constexpr std::array<std::array<uint8_t, 4>, 4> DForm = {{
+//                 {{1, 1, 0, 0}},
+//                 {{1, 0, 1, 0}},
+//                 {{1, 0, 1, 0}},
+//                 {{1, 1, 0, 0}},
+//             }};
+//     constexpr std::array<std::array<uint8_t, 4>, 4> RForm = {{
+//                 {{1, 1, 0, 0}},
+//                 {{1, 0, 1, 0}},
+//                 {{1, 1, 0, 0}},
+//                 {{1, 0, 1, 0}},
+//             }};
+//     constexpr std::array<std::array<uint8_t, 4>, 4> IForm = {{
+//                 {{1, 1, 1, 0}},
+//                 {{0, 1, 0, 0}},
+//                 {{0, 1, 0, 0}},
+//                 {{1, 1, 1, 0}},
+//             }};
+//     constexpr std::array<std::array<uint8_t, 4>, 4> MForm = {{
+//                 {{1, 0, 1, 0}},
+//                 {{1, 1, 1, 0}},
+//                 {{1, 0, 1, 0}},
+//                 {{1, 0, 1, 0}},
+//             }};
+//     constexpr std::array<std::array<uint8_t, 4>, 4> EForm = {{
+//                 {{1, 1, 1, 0}},
+//                 {{1, 1, 1, 0}},
+//                 {{1, 0, 0, 0}},
+//                 {{1, 1, 1, 0}},
+//             }};
+
+//     const std::array<std::array<uint8_t, 4>, 4> text_forms[5] = {DForm, RForm, IForm, MForm, EForm};
+
+//     int revealed = 0;
+//     for (size_t i = 0; i < text_forms.size(); ++i) {
+//         if (revealed >= reveal_pixels) {
+//             break;
+//         }
+//         draw_form(canvas, text_forms[i], top, left + static_cast<int>(i) * 5, clamp_i(reveal_pixels - revealed, 0, 16));
+//         revealed += 16; // Each form has up to 16 pixels to reveal
+//     }
+// }
 
 Canvas build_canvas(int frame)
 {
@@ -413,74 +434,47 @@ Canvas build_canvas(int frame)
         if (blink_off) {
             return canvas;
         }
-        draw_logo(canvas, base_top[0], base_left[0], 16);
+        draw_logo(canvas, 8, 0, 16);
+        //draw_drime_text(canvas, base_top[0], base_left[0], finale);
         return canvas;
     }
 
     return canvas;
 }
 
-Bitmap canvas_to_bitmap(const Canvas &canvas)
+void canvas_to_bitmap(const Canvas &canvas, uint8_t (&bitmap)[SIZE][SIZE])
 {
-    Bitmap bitmap{};
-
     for (int y = 0; y < kGridSize; ++y) {
         for (int x = 0; x < kGridSize; ++x) {
-            if (!is_drawable(y, x)) {
-                continue;
-            }
-
-            const int panel = panel_index(y, x);
-            if (panel < 0) {
-                continue;
-            }
-
-            const int local_y = y % kPanelSize;
-            const int local_x = x % kPanelSize;
-            const int index = panel * 64 + local_y * 8 + local_x;
-            bitmap[static_cast<std::size_t>(index)] =
-                canvas[static_cast<std::size_t>(y)][static_cast<std::size_t>(x)];
+            bitmap[static_cast<std::size_t>(y)][static_cast<std::size_t>(x)] =
+                is_drawable(y, x) ? canvas[static_cast<std::size_t>(y)][static_cast<std::size_t>(x)] : LOW;
         }
     }
-
-    return bitmap;
-}
-
-void send_bitmap(const Bitmap &bitmap)
-{
-    sim(SORTIE_3, HIGH);
-
-    for (int panel = 4; panel >= 0; --panel) {
-        for (int row = 0; row < 8; ++row) {
-            for (int col = 7; col >= 0; --col) {
-                const int index = panel * 64 + row * 8 + col;
-                const uint8_t bit = bitmap[static_cast<std::size_t>(index)] ? HIGH : LOW;
-                sim(SORTIE_4, bit);
-                sim(SORTIE_2, HIGH);
-            }
-        }
-    }
-
-    sim(SORTIE_1, HIGH);
 }
 } // namespace
 
 int main()
 {
     std::signal(SIGINT, signal_handler);
-    sim_init();
+    if (wiringPiSetupGpio() < 0) {
+        return 1;
+    }
+
+    CroixPharma croix;
+    croix.begin();
+    croix.setSide(CroixPharma::BOTH);
 
     int frame = 0;
     while (g_running) {
         const Canvas canvas = build_canvas(frame);
-        const Bitmap bitmap = canvas_to_bitmap(canvas);
+        uint8_t bitmap[SIZE][SIZE] = {};
+        canvas_to_bitmap(canvas, bitmap);
 
-        send_bitmap(bitmap);
+        croix.writeBitmap(bitmap);
         std::this_thread::sleep_for(std::chrono::milliseconds(kFrameTimeMs));
         frame = (frame + 1) % kLoopFrames;
     }
 
-    const Bitmap empty{};
-    send_bitmap(empty);
+    croix.clear();
     return 0;
 }
