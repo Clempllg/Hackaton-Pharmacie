@@ -1,0 +1,116 @@
+name: 🔔 Notify Discord on Push
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  discord-notify:
+    name: Send push notification to Discord
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build & send Discord embed
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          PUSHER="${{ github.actor }}"
+          BRANCH="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          REPO_URL="https://github.com/$REPO"
+          COMPARE_URL="https://github.com/$REPO/compare/${{ github.event.before }}...${{ github.sha }}"
+          AVATAR_URL="https://github.com/$PUSHER.png?size=32"
+          PUSHER_URL="https://github.com/$PUSHER"
+
+          COMMIT_LIST=$(git log ${{ github.event.before }}..${{ github.sha }} \
+            --pretty=format:"%H|||%s|||https://github.com/$REPO/commit/%H" \
+            2>/dev/null | head -5 || echo "")
+
+          FIELDS_JSON=""
+          COUNT=0
+          TOTAL=$(git rev-list --count ${{ github.event.before }}..${{ github.sha }} 2>/dev/null || echo "1")
+
+          while IFS='|||' read -r sha msg url; do
+            [ -z "$sha" ] && continue
+            SHORT_SHA="${sha:0:7}"
+            SAFE_MSG=$(echo "$msg" | cut -c1-72 | sed 's/"/\\"/g')
+            LINE="[\`$SHORT_SHA\`]($url) $SAFE_MSG"
+            if [ -z "$FIELDS_JSON" ]; then
+              FIELDS_JSON="$LINE"
+            else
+              FIELDS_JSON="$FIELDS_JSON\n$LINE"
+            fi
+            COUNT=$((COUNT + 1))
+          done <<< "$COMMIT_LIST"
+
+          if [ -z "$FIELDS_JSON" ]; then
+            SHORT_SHA="${{ github.sha }}"
+            SHORT_SHA="${SHORT_SHA:0:7}"
+            SAFE_MSG=$(echo "${{ github.event.head_commit.message }}" | head -1 | cut -c1-72 | sed 's/"/\\"/g')
+            FIELDS_JSON="[\`$SHORT_SHA\`](https://github.com/$REPO/commit/${{ github.sha }}) $SAFE_MSG"
+            TOTAL=1
+          fi
+
+          EXTRA_TEXT=""
+          if [ "$TOTAL" -gt 5 ]; then
+            EXTRA=$((TOTAL - 5))
+            EXTRA_TEXT="\n\n_…et $EXTRA commit(s) supplémentaire(s)_"
+          fi
+
+          DESCRIPTION="$FIELDS_JSON$EXTRA_TEXT"
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "username": "GitHub",
+            "avatar_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+            "embeds": [
+              {
+                "color": 2368263,
+                "author": {
+                  "name": "$PUSHER",
+                  "url": "$PUSHER_URL",
+                  "icon_url": "$AVATAR_URL"
+                },
+                "title": "📦 Push sur \`$REPO\` — branche \`$BRANCH\`",
+                "url": "$COMPARE_URL",
+                "description": "$DESCRIPTION",
+                "fields": [
+                  {
+                    "name": "Commits",
+                    "value": "$TOTAL commit(s)",
+                    "inline": true
+                  },
+                  {
+                    "name": "Repo",
+                    "value": "[$REPO]($REPO_URL)",
+                    "inline": true
+                  }
+                ],
+                "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+                "footer": {
+                  "text": "$REPO"
+                }
+              }
+            ]
+          }
+          EOF
+          )
+
+          HTTP_STATUS=$(curl -s -o /tmp/discord_response.txt -w "%{http_code}" \
+            -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "✅ Notification Discord envoyée (HTTP $HTTP_STATUS)"
+          else
+            echo "❌ Échec de l'envoi Discord (HTTP $HTTP_STATUS)"
+            cat /tmp/discord_response.txt
+            exit 1
+          fi
